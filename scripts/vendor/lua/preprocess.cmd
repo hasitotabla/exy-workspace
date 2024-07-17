@@ -1,0 +1,1 @@
+@.\scripts\vendor\lua\luajit.exe "%~dp0preprocess/preprocess-cl.lua" %*
