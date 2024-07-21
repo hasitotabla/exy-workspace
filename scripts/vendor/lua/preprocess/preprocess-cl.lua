@@ -477,7 +477,7 @@ for i = 1, #pathsIn do
 	pathsSetIn [pathsIn [i]] = true
 	pathsSetOut[pathsOut[i]] = true
 
-    print(pathsIn [i], pathsOut[i])
+    -- print(pathsIn [i], pathsOut[i])
 
 	if pathsIn [i] ~= "-" and pathsSetOut[pathsIn [i]] then  errorLine("Path is both input and output: "..pathsIn [i])  end
 	if pathsOut[i] ~= "-" and pathsSetIn [pathsOut[i]] then  errorLine("Path is both input and output: "..pathsOut[i])  end

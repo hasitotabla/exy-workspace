@@ -21,7 +21,8 @@ type Resource = BaseResource | ScriptResource;
 const resources: Array<Resource> = [];
 
 export async function buildServer() {
-  GLOBAL_ENV = envParse(fs.readFileSync(path.resolve("./.env")));
+  const envPath = path.resolve("./.env");
+  GLOBAL_ENV = fs.existsSync(envPath) ? envParse(fs.readFileSync(envPath)) : {};
 
   if (CLEAN_BUILD)
     fs.rmdirSync(path.join(DIST_FOLDER, "server-data/resources"), { recursive: true });
