@@ -99,7 +99,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
       try {
         spawnSync(
-          `${isLunix() ? "bash " : ""}preprocessScriptPath`,
+          (isLunix() ? "bash " : "") + preprocessScriptPath,
           [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, targetPath],
           { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
         );
@@ -120,7 +120,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
     try {
       spawnSync(
-        preprocessScriptPath,
+        (isLunix() ? "bash " : "") + preprocessScriptPath,
         [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, tempOutputPath],
         { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
       );
