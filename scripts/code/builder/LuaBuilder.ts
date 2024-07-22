@@ -21,6 +21,10 @@ export interface ILuaBuilderOptions {
   env: { [key: string]: string };
 }
 
+const preprocessScriptPath = path.resolve(
+  `./scripts/vendor/lua/preprocess${process.platform === "win32" ? ".cmd" : ".sh"}`
+);
+
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
 };
@@ -92,7 +96,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
       try {
         spawnSync(
-          path.resolve("./scripts/vendor/lua/preprocess.cmd"),
+          preprocessScriptPath,
           [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, targetPath],
           { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
         );
@@ -113,7 +117,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
     try {
       spawnSync(
-        path.resolve("./scripts/vendor/lua/preprocess.cmd"),
+        preprocessScriptPath,
         [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, tempOutputPath],
         { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
       );
