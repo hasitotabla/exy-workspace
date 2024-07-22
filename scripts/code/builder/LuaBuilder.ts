@@ -26,7 +26,6 @@ const isLunix = () => ["linux", "darwin"].includes(process.platform);
 const preprocessScriptPath = path.resolve(
   `./scripts/vendor/lua/preprocess${isLunix() ? ".sh" : ".cmd"}`
 );
-console.log("existxd", fs.existsSync(preprocessScriptPath));
 
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
@@ -41,7 +40,8 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
   const runPreprocessor = async (sourcePath: string, targetPath: string) => {
     try {
-      console.log("targetPath", targetPath);
+      const targetFolder = path.dirname(targetPath);
+      if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder, { recursive: true });
 
       if (isLunix())
         spawnSync(
@@ -124,7 +124,6 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
     );
 
     fs.mkdirSync(path.dirname(tempBuildPath), { recursive: true });
-    console.log("tempBuildPath", tempBuildPath);
 
     if (fs.existsSync(tempBuildPath)) fs.unlinkSync(tempBuildPath);
     fs.writeFileSync(tempBuildPath, preprocessedSource);
