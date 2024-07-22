@@ -63,7 +63,6 @@ export function useServer(
     });
 
     const data = await response.text();
-    console.log(data);
   };
 
   return {

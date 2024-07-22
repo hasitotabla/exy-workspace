@@ -7,8 +7,10 @@ export function getPlatform() {
 
 export const normalize = (str: string) => str.replace(/\\/g, "/");
 export const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+
 export const sanitizeBrackets = (Path: string) =>
   Path.replace(/[\[\]]/g, (Match) => `\\${Match}`);
+
 export const generateString = (length: number) =>
   Array.from({ length }, () => Math.random().toString(36)[2]).join("");
 

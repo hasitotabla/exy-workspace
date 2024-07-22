@@ -18,7 +18,9 @@ const FORCE_REBUILD = bun.argv.includes("--rebuild");
 const CLEAN_BUILD = bun.argv.includes("--clean");
 
 type Resource = BaseResource | ScriptResource;
-const resources: Array<Resource> = [];
+
+export const resourceImportHierarchy: { [key: string]: ScriptResource[] } = {};
+export const resources: Array<Resource> = [];
 
 export async function buildServer() {
   const envPath = path.resolve("./.env");
@@ -44,7 +46,23 @@ export async function buildServer() {
       resources.push(resource);
     }
 
-    for (const resource of resources) await resource.build({ force: FORCE_REBUILD });
+    for (const resource of resources) {
+      const result = await resource.build();
+      if (!result.success) {
+        console.error(`Failed to build resource ${resource.name}`);
+        continue;
+      }
+
+      for (const inclusion of result.data.resourceInclusions) {
+        if (!resourceImportHierarchy[inclusion]) resourceImportHierarchy[inclusion] = [];
+
+        // Prevent duplicates
+        if (resourceImportHierarchy[inclusion].find((r) => r.name === resource.name))
+          continue;
+
+        resourceImportHierarchy[inclusion].push(resource);
+      }
+    }
   }
 
   copyConfig();

@@ -19,6 +19,9 @@
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
 
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,

@@ -27,5 +27,8 @@
   "module": "index.ts",
   "peerDependencies": {
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@type-cacheable/core": "^14.0.1"
   }
 }
