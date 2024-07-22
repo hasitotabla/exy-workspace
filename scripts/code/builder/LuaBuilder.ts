@@ -21,11 +21,12 @@ export interface ILuaBuilderOptions {
   env: { [key: string]: string };
 }
 
-const isPlatformLinux = () => ["linux", "darwin"].includes(process.platform);
+const isLunix = () => ["linux", "darwin"].includes(process.platform);
 
-const preprocessScriptPath =
-  (isPlatformLinux() ? "bash " : "") +
-  path.resolve(`./scripts/vendor/lua/preprocess${isPlatformLinux() ? ".sh" : ".cmd"}`);
+const preprocessScriptPath = path.resolve(
+  `./scripts/vendor/lua/preprocess${isLunix() ? ".sh" : ".cmd"}`
+);
+console.log("existxd", fs.existsSync(preprocessScriptPath));
 
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
@@ -98,7 +99,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
       try {
         spawnSync(
-          preprocessScriptPath,
+          `${isLunix() ? "bash " : ""}preprocessScriptPath`,
           [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, targetPath],
           { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
         );
