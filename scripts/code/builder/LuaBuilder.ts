@@ -25,34 +25,24 @@ const preprocessScriptPath = path.resolve(
   `./scripts/vendor/lua/preprocess${process.platform === "win32" ? ".cmd" : ".sh"}`
 );
 
-async function getFolderStructure(folder: string): Promise<any> {
-  const files = fs.readdirSync(folder, { withFileTypes: true });
-  const result = [];
+(async () => {
+  function getAllFiles(dirPath: string) {
+    const accPath: string[] = [];
+    fs.readdirSync(dirPath).forEach((file) => {
+      const filepath = path.join(dirPath, file);
+      const stat = fs.statSync(filepath);
+      if (stat.isDirectory()) {
+        // you have to use the data returned from getAllFiles
+        accPath.push(...getAllFiles(filepath));
+      } else {
+        accPath.push(filepath);
+      }
+    });
 
-  for (const file of files) {
-    if (file.isDirectory()) {
-      result.push({
-        name: file.name,
-        type: "folder",
-        children: await getFolderStructure(path.join(folder, file.name)),
-      });
-    } else {
-      result.push({
-        name: file.name,
-        type: "file",
-      });
-    }
+    return accPath;
   }
 
-  return result;
-}
-
-(async () => {
-  console.log(
-    preprocessScriptPath,
-    process.cwd(),
-    await getFolderStructure(process.cwd())
-  );
+  console.log(preprocessScriptPath, process.cwd(), getAllFiles(process.cwd()));
 })();
 
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
