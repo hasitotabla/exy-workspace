@@ -41,6 +41,8 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
 
   const runPreprocessor = async (sourcePath: string, targetPath: string) => {
     try {
+      console.log("targetPath", targetPath);
+
       if (isLunix())
         spawnSync(
           "sh",
@@ -59,6 +61,11 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
           [DEBUG_ENABLED ? "--silent" : "", "-o", sourcePath, targetPath],
           { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
         );
+
+      for (let i = 0; i < 30; i++) {
+        if (fs.existsSync(targetPath)) break;
+        await sleep(100);
+      }
 
       return true;
     } catch (error) {
@@ -117,6 +124,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
     );
 
     fs.mkdirSync(path.dirname(tempBuildPath), { recursive: true });
+    console.log("tempBuildPath", tempBuildPath);
 
     if (fs.existsSync(tempBuildPath)) fs.unlinkSync(tempBuildPath);
     fs.writeFileSync(tempBuildPath, preprocessedSource);
@@ -128,11 +136,6 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
     const tempOutputPath = `${tempBuildPath}_${generateString(8)}.out`;
     if (!runPreprocessor(tempBuildPath, tempOutputPath)) {
       return false;
-    }
-
-    for (let i = 0; i < 30; i++) {
-      if (fs.existsSync(tempOutputPath)) break;
-      await sleep(100);
     }
 
     if (!fs.existsSync(tempOutputPath)) {
