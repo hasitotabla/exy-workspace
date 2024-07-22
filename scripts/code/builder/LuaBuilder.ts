@@ -47,7 +47,13 @@ async function getFolderStructure(folder: string): Promise<any> {
   return result;
 }
 
-console.log(preprocessScriptPath, process.cwd(), getFolderStructure(process.cwd()));
+(async () => {
+  console.log(
+    preprocessScriptPath,
+    process.cwd(),
+    await getFolderStructure(process.cwd())
+  );
+})();
 
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
