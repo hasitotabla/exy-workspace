@@ -24,7 +24,30 @@ export interface ILuaBuilderOptions {
 const preprocessScriptPath = path.resolve(
   `./scripts/vendor/lua/preprocess${process.platform === "win32" ? ".cmd" : ".sh"}`
 );
-console.log(preprocessScriptPath, process.cwd());
+
+async function getFolderStructure(folder: string): Promise<any> {
+  const files = fs.readdirSync(folder, { withFileTypes: true });
+  const result = [];
+
+  for (const file of files) {
+    if (file.isDirectory()) {
+      result.push({
+        name: file.name,
+        type: "folder",
+        children: await getFolderStructure(path.join(folder, file.name)),
+      });
+    } else {
+      result.push({
+        name: file.name,
+        type: "file",
+      });
+    }
+  }
+
+  return result;
+}
+
+console.log(preprocessScriptPath, process.cwd(), getFolderStructure(process.cwd()));
 
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
