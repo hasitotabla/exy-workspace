@@ -30,7 +30,10 @@ async function main() {
     return null;
   };
 
-  const buildResource = async (name: string, path: string): Promise<string[] | null> => {
+  const isPathIgnored = (filePath: string) =>
+    ["node_modules", ".git"].some((x) => filePath.includes(x));
+
+  const buildResources = async (name: string, path: string): Promise<string[] | null> => {
     const resource = ScriptResource.create(name, path);
     const result = await resource.build();
 
@@ -55,7 +58,7 @@ async function main() {
   };
 
   const onFileChange = async (filePath: string) => {
-    if (!filePath) return;
+    if (isPathIgnored(filePath)) return;
 
     const resourceData = getResourceDetailsFromPath(filePath);
     if (!resourceData) return;
@@ -64,23 +67,11 @@ async function main() {
     if (fileChanges[resourceName]) clearTimeout(fileChanges[resourceName]);
 
     fileChanges[resourceName] = setTimeout(async () => {
-      const resourcesToRestart = await buildResource(resourceName, resourcePath);
+      const resourcesToRestart = await buildResources(resourceName, resourcePath);
       if (!resourcesToRestart) return;
 
       server.restartResources(resourcesToRestart);
     }, 500);
-
-    // fileChanges[resourceName] = setTimeout(async () => {
-    //   const resource = ScriptResource.create(resourceName, resourcePath);
-    //   const result = await resource.build();
-
-    //   if (!result.success) {
-    //     console.error(`Failed to build resource ${resourceName}`);
-    //     return;
-    //   }
-
-    //   server.restartResources([...result.data.resourceInclusions, resourceName]);
-    // }, 500);
   };
 
   fs.watch(
