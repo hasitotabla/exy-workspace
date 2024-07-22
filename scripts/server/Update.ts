@@ -1,4 +1,3 @@
-import { $ } from "bun";
 import fs from "fs";
 import path from "path";
 import axios from "axios";
@@ -8,10 +7,22 @@ import ora, { type Ora } from "ora";
 
 import { downloadFile } from "../Utils";
 import { DIST_FOLDER } from "../Consts";
+import { useArguments } from "../utility/Arguments";
+
+type ServerBranches = "master" | "recommended" | "latest";
+const VALID_BRANCHES: ServerBranches[] = ["master", "recommended", "latest"];
+
+const cmdParser = useArguments();
+
+const usedBranch = cmdParser.get<ServerBranches>("--branch", "recommended", ["-b"]);
+if (!usedBranch || !VALID_BRANCHES.includes(usedBranch)) {
+  console.error("Invalid branch specified");
+  process.exit(1);
+}
 
 async function getLatestRelease(
   platform: string,
-  branch: "master" | "recommended" | "latest"
+  branch: ServerBranches
 ): Promise<string | null> {
   let htmlData = "";
 
@@ -113,16 +124,6 @@ async function extractServer(fileName: string, outputFolder: string): Promise<bo
 
     // TODO: Implement this shit
     case "linux":
-      //   const promise = new Promise<boolean>((resolve, reject) => {
-      //     const result = $`tar -xvf .cache/${fileName} -C ${outputFolder}`;
-      //     console.log(result);
-
-      //     // fs.rmSync(".cache/", { recursive: true });
-      //     // resolve(true);
-      //   });
-
-      //   return promise;
-
       return false;
 
     default:
@@ -144,7 +145,7 @@ export async function updateServer(
     "latest"
   );
   if (!latestReleaseUrl) {
-    if (spinnerHandle) spinnerHandle.fail("Failed to get latest release URL");
+    if (spinnerHandle) spinnerHandle.fail(`Failed to get ${usedBranch}'s release URL`);
 
     return false;
   }
@@ -157,7 +158,7 @@ export async function updateServer(
   await downloadFile(latestReleaseUrl, `./.cache/${fileName}`);
 
   if (!fs.existsSync(`./.cache/${fileName}`)) {
-    if (spinnerHandle) spinnerHandle.fail("Failed to download the latest release");
+    if (spinnerHandle) spinnerHandle.fail(`Failed to download the ${usedBranch} release`);
     return false;
   }
 
@@ -166,11 +167,11 @@ export async function updateServer(
     fs.mkdirSync(serverBinFolder, { recursive: true });
   }
 
-  if (spinnerHandle) spinnerHandle.text = "Extracting the latest release...";
+  if (spinnerHandle) spinnerHandle.text = `Extracting ${usedBranch} release...`;
 
   const success = await extractServer(fileName, serverBinFolder);
   if (!success) {
-    if (spinnerHandle) spinnerHandle.fail("Failed to extract the latest release");
+    if (spinnerHandle) spinnerHandle.fail(`Failed to extract ${usedBranch} release`);
     return false;
   }
 

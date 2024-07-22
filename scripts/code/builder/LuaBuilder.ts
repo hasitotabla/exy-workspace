@@ -33,7 +33,6 @@ const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
 
 export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
   const _options = { ...defaultLuaBuilderOptions, ...options } as ILuaBuilderOptions;
-  const buildSessionId = generateString(8);
 
   if (!_options.outputTarget)
     throw new Error(`Output target does not exist: ${_options.outputTarget}`);
