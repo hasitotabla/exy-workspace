@@ -21,29 +21,11 @@ export interface ILuaBuilderOptions {
   env: { [key: string]: string };
 }
 
-const preprocessScriptPath = path.resolve(
-  `./scripts/vendor/lua/preprocess${process.platform === "win32" ? ".cmd" : ".sh"}`
-);
+const isPlatformLinux = () => ["linux", "darwin"].includes(process.platform);
 
-(async () => {
-  function getAllFiles(dirPath: string) {
-    const accPath: string[] = [];
-    fs.readdirSync(dirPath).forEach((file) => {
-      const filepath = path.join(dirPath, file);
-      const stat = fs.statSync(filepath);
-      if (stat.isDirectory()) {
-        // you have to use the data returned from getAllFiles
-        accPath.push(...getAllFiles(filepath));
-      } else {
-        accPath.push(filepath);
-      }
-    });
-
-    return accPath;
-  }
-
-  console.log(preprocessScriptPath, process.cwd(), getAllFiles(process.cwd()));
-})();
+const preprocessScriptPath =
+  (isPlatformLinux() ? "bash " : "") +
+  path.resolve(`./scripts/vendor/lua/preprocess${isPlatformLinux() ? ".sh" : ".cmd"}`);
 
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
