@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import yaml from "yaml";
 import { glob } from "glob";
+import { Cacheable } from "../decorator/Cache";
 
 import {
   convertManifestValue,
@@ -52,6 +53,10 @@ export class BaseResource {
   protected _env: { [key: string]: string } = {};
   protected _outputTarget: string;
 
+  public get name(): string {
+    return this._name;
+  }
+
   constructor(protected _name: string, protected _resourceRoot: string) {
     this._outputTarget = normalize(
       path.join(DIST_FOLDER, "server-data/resources/", _name)
@@ -82,6 +87,7 @@ export class BaseResource {
     return { success: false, message: "Not implemented." };
   }
 
+  @Cacheable((args) => `filePath:${args[0]}`)
   public getResourceFile(filePath: ResourceScript): Array<{
     manifestPath: string;
     sourcePath: string;
@@ -94,6 +100,7 @@ export class BaseResource {
     }));
   }
 
+  @Cacheable((args) => `resolve:${args[0]}`)
   public resolveFilePath(filePath: string): Array<ResourceResolvedItem> {
     const matched = /^\$([a-zA-Z0-9_\-]{1,24})\/(.*?)(?::(.*))?$/gm.exec(filePath);
     if (matched) {
