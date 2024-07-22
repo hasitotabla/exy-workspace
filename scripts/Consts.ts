@@ -1,9 +1,11 @@
+import * as bun from "bun";
+
 import fs from "fs";
 import path from "path";
 
-export const DEBUG_ENABLED = true;
-export const BUNDLE_SCRIPTS = false;
-export const MINIFY_OUTPUT = false;
+export const DEBUG_ENABLED = bun.argv.includes("--debug") ?? true;
+export const BUNDLE_SCRIPTS = bun.argv.includes("--bundle") ?? false;
+export const MINIFY_OUTPUT = bun.argv.includes("--minify") ?? false;
 
 export const RESOURCE_PER_WORKER = 5;
 export const IS_WORKERS_ENABLED = false;
