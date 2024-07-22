@@ -21,10 +21,9 @@ export interface ILuaBuilderOptions {
   env: { [key: string]: string };
 }
 
-const preprocessScriptPath = path.resolve(
-  `./scripts/vendor/lua/preprocess${process.platform === "win32" ? ".cmd" : ".sh"}`
-);
-
+const preprocessScriptPath = `./scripts/vendor/lua/preprocess${
+  process.platform === "win32" ? ".cmd" : ".sh"
+}`;
 const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
 };
