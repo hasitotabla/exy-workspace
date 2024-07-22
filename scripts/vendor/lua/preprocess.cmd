@@ -1,1 +1,1 @@
-@.\scripts\vendor\lua\luajit.exe "%~dp0preprocess/preprocess-cl.lua" %*
+@.\scripts\vendor\lua\bin\luajit.exe "%~dp0preprocess/preprocess-cl.lua" %*

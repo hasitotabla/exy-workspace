@@ -7,12 +7,13 @@ import {
   convertManifestValue,
   defaultManifestOptions,
   type IResourceManifest,
-  type IResourceResolvedItem,
-  type IResourceScript,
-  type IResourceScriptEnv,
+  type ResourceResolvedItem,
+  type ResourceResolvedScripts,
+  type ResourceScript,
+  type ResourceScriptEnv,
 } from "./Manifest";
 import { GLOBAL_ENV } from "../Build";
-import { capitalize, normalize, sanitizeBrackets } from "../../Utils";
+import { normalize, sanitizeBrackets } from "../../Utils";
 import { BUNDLE_SCRIPTS, CACHE_FOLDER, DIST_FOLDER } from "../../Consts";
 import { ScriptResource } from "./ScriptResource";
 
@@ -81,7 +82,7 @@ export class BaseResource {
     return { success: false, message: "Not implemented." };
   }
 
-  public getResourceFile(filePath: IResourceScript): Array<{
+  public getResourceFile(filePath: ResourceScript): Array<{
     manifestPath: string;
     sourcePath: string;
   }> {
@@ -93,7 +94,7 @@ export class BaseResource {
     }));
   }
 
-  public resolveFilePath(filePath: string): Array<IResourceResolvedItem> {
+  public resolveFilePath(filePath: string): Array<ResourceResolvedItem> {
     const matched = /^\$([a-zA-Z0-9_\-]{1,24})\/(.*?)(?::(.*))?$/gm.exec(filePath);
     if (matched) {
       const [_, resourceName, innerPath, targetPath] = matched;
@@ -152,18 +153,31 @@ export class BaseResource {
     }));
   }
 
-  /**
-   *
-   */
-  protected generateResourceManifest(): void {
-    let outputString = "";
+  protected copyResourceFiles() {
+    if (!this._manifest?.files) return;
 
-    if (this._manifest.info) {
+    for (const file of this._manifest.files) {
+      const resolved = this.resolveFilePath(typeof file === "string" ? file : file.src);
+
+      for (const fileItem of resolved) {
+        const targetPath = path.dirname(fileItem.target);
+        if (!fs.existsSync(targetPath)) fs.mkdirSync(targetPath, { recursive: true });
+
+        fs.copyFileSync(fileItem.source, fileItem.target);
+      }
+    }
+  }
+
+  protected generateResourceManifest(scripts: ResourceResolvedScripts): void {
+    let outputString = "";
+    const manifest = this._manifest as IResourceManifest;
+
+    if (manifest.info) {
       outputString += `--[[\n`;
 
-      for (const key in this._manifest.info) {
+      for (const key in manifest.info) {
         // @ts-ignore
-        outputString += `\t@${key} ${this._manifest.info[key]}\n`;
+        outputString += `\t@${key} ${manifest.info[key]}\n`;
       }
 
       outputString += `]]\n\n`;
@@ -179,13 +193,13 @@ export class BaseResource {
       // "resource_manifest_version",
     ] as (keyof IResourceManifest)[]) {
       const value =
-        this._manifest[key as keyof IResourceManifest] || defaultManifestOptions[key];
+        manifest[key as keyof IResourceManifest] || defaultManifestOptions[key];
       if (!value) continue;
 
       outputString += `${key} ${convertManifestValue(value)}\n`;
     }
 
-    // if (this._manifest[key]) outputString += `${key} `;
+    outputString += `\n\n`;
 
     if (BUNDLE_SCRIPTS) {
       if (fs.existsSync(path.join(this._outputTarget, "server_bundle.lua")))
@@ -194,48 +208,75 @@ export class BaseResource {
       if (fs.existsSync(path.join(this._outputTarget, "client_bundle.lua")))
         outputString += `client_script 'client_bundle.lua'\n`;
     } else {
-      const convertToEnvSpecific = (scriptPath: string, env: IResourceScriptEnv) => {
+      const convertToEnvSpecific = (scriptPath: string, env: ResourceScriptEnv) => {
         const parsedPath = path.parse(scriptPath);
         return normalize(path.join(parsedPath.dir, `${parsedPath.name}_${env}.lua`));
       };
 
-      for (const scriptEnv of ["server", "client"] as IResourceScriptEnv[]) {
+      for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[]) {
         outputString += `${scriptEnv}_scripts {\n`;
 
-        //
-        // shared first
-        //
+        if (scripts?.shared_scripts)
+          for (const script of scripts.shared_scripts) {
+            if (typeof script !== "string" && script.excludeFromManifest) continue;
 
-        const sharedScripts = this._manifest.shared_scripts as Array<IResourceScript>;
-        if (sharedScripts) {
-          for (const script of sharedScripts) {
-            const resolved = this.resolveFilePath(script);
+            const scriptSource = typeof script === "string" ? script : script.src;
+            const resolved = this.resolveFilePath(scriptSource);
             for (const scriptFile of resolved)
               outputString += `\t"${convertToEnvSpecific(
                 scriptFile.targetManifest,
                 scriptEnv
               )}",\n`;
           }
+
+        if (scripts[`${scriptEnv}_scripts`])
+          for (const script of scripts[`${scriptEnv}_scripts`]) {
+            if (typeof script !== "string" && script.excludeFromManifest) continue;
+
+            const scriptSource = typeof script === "string" ? script : script.src;
+            const resolved = this.resolveFilePath(scriptSource);
+            for (const scriptFile of resolved)
+              outputString += `\t"${convertToEnvSpecific(
+                scriptFile.targetManifest,
+                scriptEnv
+              )}",\n`;
+          }
+
+        outputString += "}\n\n";
+      }
+    }
+
+    if (manifest?.files) {
+      outputString += `files {\n`;
+
+      for (const file of manifest.files) {
+        if (typeof file !== "string" && file.serverOnly) continue;
+
+        const filePath = typeof file === "string" ? file : file.src;
+        const resolved = this.resolveFilePath(filePath);
+
+        for (const fileItem of resolved)
+          outputString += `\t'${fileItem.targetManifest}',\n`;
+      }
+
+      outputString += "}\n\n";
+    }
+
+    if (manifest?.exports) {
+      for (const env of ["shared", "server", "client"] as ResourceScriptEnv[]) {
+        outputString += `${env}_exports {\n`;
+
+        for (const exportItem of manifest.exports) {
+          const exportEnv =
+            typeof exportItem === "string" ? {} : exportItem.env ?? "server";
+          if (exportEnv !== env) continue;
+
+          const funcName =
+            typeof exportItem === "string" ? exportItem : exportItem.function;
+          outputString += `\t"${funcName}",\n`;
         }
 
-        //
-        // env's scripts
-        //
-
-        const envScripts = this._manifest[
-          `${scriptEnv}_scripts`
-        ] as Array<IResourceScript>;
-        if (envScripts)
-          for (const script of envScripts) {
-            const resolved = this.resolveFilePath(script);
-            for (const scriptFile of resolved)
-              outputString += `\t"${convertToEnvSpecific(
-                scriptFile.targetManifest,
-                scriptEnv
-              )}",\n`;
-          }
-
-        outputString += "}\n";
+        outputString += "}\n\n";
       }
     }
 

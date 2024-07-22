@@ -57,10 +57,13 @@ async function main() {
     (event, fileName) => fileName && onFileChange(normalize(fileName))
   );
 
-  await buildServer();
   server.start();
 }
 
 if (import.meta && import.meta.main) {
+  console.log("Building server...");
+  await buildServer();
+  console.log("Build finished");
+
   main();
 }

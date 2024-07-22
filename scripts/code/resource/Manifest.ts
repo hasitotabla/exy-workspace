@@ -1,7 +1,8 @@
-export type IResourceScriptEnv = "shared" | "server" | "client";
-export type IResourceScript = string;
-export type IResourceGameType = "gta5" | "gta4" | "rdr3";
-export type IResourceResolvedItem = {
+export type ResourceScriptEnv = "shared" | "server" | "client";
+export type ResourceScript = string;
+export type ResourceGameType = "gta5" | "gta4" | "rdr3";
+
+export type ResourceResolvedItem = {
   resourceName: string;
 
   source: string;
@@ -11,11 +12,26 @@ export type IResourceResolvedItem = {
   targetManifest: string;
 };
 
+export type ResourceResolvedScripts = {
+  [key in `${ResourceScriptEnv}_scripts`]: Array<ResourceScriptFile | string>;
+};
+
+export type ResourceScriptFile = {
+  excludeFromManifest?: boolean;
+  src: string;
+  env: ResourceScriptEnv;
+};
+
+export type ResourceFile = {
+  src: string;
+  serverOnly?: boolean;
+};
+
 type IResourceDegenerateBoolean = "yes" | "no";
 
 export interface IResourceManifest {
   fx_version: string;
-  game: IResourceGameType | IResourceGameType[];
+  game: ResourceGameType | ResourceGameType[];
   use_fxv2_oal: IResourceDegenerateBoolean;
   lua54: IResourceDegenerateBoolean;
 
@@ -34,14 +50,13 @@ export interface IResourceManifest {
     [key: string]: string;
   };
 
-  shared_scripts: Array<string>;
-  client_scripts: Array<string>;
-  server_scripts: Array<string>;
+  shared_scripts: Array<ResourceScriptFile | string>;
+  client_scripts: Array<ResourceScriptFile | string>;
+  server_scripts: Array<ResourceScriptFile | string>;
 
-  server_files: Array<string>;
-  files: Array<string>;
+  files: Array<ResourceFile | string>;
 
-  exports: Array<string>;
+  exports: Array<{ function: string; env: ResourceScriptEnv } | string>;
 
   import_deps: {
     __default__: Array<string>;

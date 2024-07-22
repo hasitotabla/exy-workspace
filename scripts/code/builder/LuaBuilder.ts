@@ -12,7 +12,7 @@ import {
   ENV_EXPOSED_PREFIXES,
   MINIFY_OUTPUT,
 } from "../../Consts";
-import type { IResourceResolvedItem, IResourceScriptEnv } from "../resource/Manifest";
+import type { ResourceResolvedItem, ResourceScriptEnv } from "../resource/Manifest";
 import { generateString } from "../../Utils";
 
 export interface ILuaBuilderOptions {
@@ -62,9 +62,20 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
           { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
         );
 
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 15; i++) {
         if (fs.existsSync(targetPath)) break;
+
+        if (i === 1)
+          console.log(
+            `Waiting for preprocessor to finish for file '${sourcePath}:${targetPath}'...`
+          );
+
         await sleep(100);
+      }
+
+      if (!fs.existsSync(targetPath)) {
+        console.error(`Preprocessor failed for file '${sourcePath}:${targetPath}'`);
+        return false;
       }
 
       return true;
@@ -75,8 +86,8 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
   };
 
   const buildAndBundle = async (
-    scripts: Array<IResourceResolvedItem>,
-    scriptEnv: IResourceScriptEnv
+    scripts: Array<ResourceResolvedItem>,
+    scriptEnv: ResourceScriptEnv
   ) => {
     let bundledContent = ``;
 
@@ -107,7 +118,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
   };
 
   const compileSource = async (
-    scriptEnv: IResourceScriptEnv,
+    scriptEnv: ResourceScriptEnv,
     sourcePath: string,
     targetPath?: string
   ): Promise<string | boolean> => {
@@ -150,7 +161,7 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
     return processedFileContent;
   };
 
-  const getSourceCode = (source: string, scriptEnv: IResourceScriptEnv) => {
+  const getSourceCode = (source: string, scriptEnv: ResourceScriptEnv) => {
     let content = fs.readFileSync(source, { encoding: "utf-8" });
     let headers = `
       !local SCRIPT_ENV = '${scriptEnv}';\n

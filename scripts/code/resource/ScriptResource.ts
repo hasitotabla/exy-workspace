@@ -7,7 +7,7 @@ import {
   type BuildOptions,
   type BuildResult,
 } from "./BaseResource";
-import type { IResourceResolvedItem, IResourceScriptEnv } from "./Manifest";
+import type { ResourceResolvedItem, ResourceScriptEnv } from "./Manifest";
 import { BUNDLE_SCRIPTS } from "../../Consts";
 import { isFileChecksumChanged } from "../../utility/Checksum";
 import { useLuaBuilder } from "../builder/LuaBuilder";
@@ -24,18 +24,20 @@ export class ScriptResource extends BaseResource {
 
     let didChecksumChange = false;
     let scriptsToBuild: {
-      [key in IResourceScriptEnv]: Array<IResourceResolvedItem>;
+      [key in ResourceScriptEnv]: Array<ResourceResolvedItem>;
     } = {
       shared: [],
       server: [],
       client: [],
     };
 
-    for (const scriptEnv of ["shared", "server", "client"] as IResourceScriptEnv[]) {
+    for (const scriptEnv of ["shared", "server", "client"] as ResourceScriptEnv[]) {
       const scripts = this._manifest[`${scriptEnv}_scripts`];
       if (!scripts) continue;
 
-      for (const scriptPath of scripts) {
+      for (const script of scripts) {
+        const scriptPath = typeof script === "string" ? script : script.src;
+
         // TODO: megfixelni ezt a szart
         let resolved = this.resolveFilePath(scriptPath).filter(
           async (x) =>
@@ -69,13 +71,13 @@ export class ScriptResource extends BaseResource {
     });
 
     if (BUNDLE_SCRIPTS) {
-      for (const scriptEnv of ["server", "client"] as IResourceScriptEnv[])
+      for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[])
         await luaBuilder.buildAndBundle(
           [...scriptsToBuild.shared, ...scriptsToBuild[scriptEnv]],
           scriptEnv
         );
     } else {
-      for (const scriptEnv of ["server", "client"] as IResourceScriptEnv[]) {
+      for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[]) {
         const combinedScripts = [...scriptsToBuild.shared, ...scriptsToBuild[scriptEnv]];
 
         for (const script of combinedScripts) {
@@ -92,7 +94,12 @@ export class ScriptResource extends BaseResource {
       }
     }
 
-    this.generateResourceManifest();
+    this.copyResourceFiles();
+    this.generateResourceManifest({
+      shared_scripts: this._manifest.shared_scripts ?? [],
+      server_scripts: this._manifest.server_scripts ?? [],
+      client_scripts: this._manifest.client_scripts ?? [],
+    });
     this.deleteBuildFolder();
 
     return { success: true, data: { resourceInclusions } };
