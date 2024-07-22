@@ -39,6 +39,34 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
   if (!_options.outputTarget)
     throw new Error(`Output target does not exist: ${_options.outputTarget}`);
 
+  const runPreprocessor = async (sourcePath: string, targetPath: string) => {
+    try {
+      if (isLunix())
+        spawnSync(
+          "sh",
+          [
+            preprocessScriptPath,
+            DEBUG_ENABLED ? "--silent" : "",
+            "-o",
+            sourcePath,
+            targetPath,
+          ],
+          { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
+        );
+      else
+        spawnSync(
+          preprocessScriptPath,
+          [DEBUG_ENABLED ? "--silent" : "", "-o", sourcePath, targetPath],
+          { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
+        );
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+  };
+
   const buildAndBundle = async (
     scripts: Array<IResourceResolvedItem>,
     scriptEnv: IResourceScriptEnv
@@ -94,38 +122,11 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
     fs.writeFileSync(tempBuildPath, preprocessedSource);
 
     if (targetPath) {
-      if (!fs.existsSync(targetPath))
-        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-
-      try {
-        spawnSync(
-          (isLunix() ? "bash " : "") + preprocessScriptPath,
-          [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, targetPath],
-          { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
-        );
-
-        if (MINIFY_OUTPUT) {
-          const content = fs.readFileSync(targetPath, { encoding: "utf-8" });
-          fs.writeFileSync(targetPath, luamin.minify(content));
-        }
-
-        return true;
-      } catch (error) {
-        console.error(error);
-        return false;
-      }
+      return runPreprocessor(tempBuildPath, targetPath);
     }
 
     const tempOutputPath = `${tempBuildPath}_${generateString(8)}.out`;
-
-    try {
-      spawnSync(
-        (isLunix() ? "bash " : "") + preprocessScriptPath,
-        [DEBUG_ENABLED ? "--silent" : "", "-o", tempBuildPath, tempOutputPath],
-        { encoding: "utf8", stdio: DEBUG_ENABLED ? "inherit" : "ignore" }
-      );
-    } catch (error) {
-      console.error(error);
+    if (!runPreprocessor(tempBuildPath, tempOutputPath)) {
       return false;
     }
 
