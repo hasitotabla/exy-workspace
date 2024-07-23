@@ -5,12 +5,13 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "start": "node scripts/server.js --silent echo",
     "update": "bun ./scripts/server/Update.ts",
     "build": "bun ./scripts/code/Build.ts",
-    "dev": "bun ./scripts/runtime/Development.ts"
+    "dev": "bun ./scripts/runtime/Development.ts",
+    "start:prod": "bun ./scripts/runtime/Production.ts"
   },
   "devDependencies": {
+    "@gerhobbelt/gitignore-parser": "^0.2.0-9",
     "@types/bun": "^1.1.4",
     "@types/dotenv": "^8.2.0",
     "@types/node-7z": "^2.1.8",
@@ -27,8 +28,5 @@
   "module": "index.ts",
   "peerDependencies": {
     "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "@type-cacheable/core": "^14.0.1"
   }
 }

@@ -12,11 +12,12 @@ import {
   type ResourceResolvedScripts,
   type ResourceScript,
   type ResourceScriptEnv,
-} from "./Manifest";
+} from "../types/Manifest";
 import { GLOBAL_ENV } from "../Build";
 import { normalize, sanitizeBrackets } from "../../Utils";
 import { BUNDLE_SCRIPTS, CACHE_FOLDER, DIST_FOLDER } from "../../Consts";
 import { ScriptResource } from "./ScriptResource";
+import type { IResourceHooks } from "../types/Hooks";
 
 export type BuildOptions = {
   force: boolean;
@@ -57,6 +58,10 @@ export class BaseResource {
     return this._name;
   }
 
+  public get manifest(): IResourceManifest {
+    return this._manifest as IResourceManifest;
+  }
+
   constructor(protected _name: string, protected _resourceRoot: string) {
     this._outputTarget = normalize(
       path.join(DIST_FOLDER, "server-data/resources/", _name)
@@ -87,7 +92,7 @@ export class BaseResource {
     return { success: false, message: "Not implemented." };
   }
 
-  @Cacheable((args) => `filePath:${args[0]}`)
+  // @Cacheable((args) => `filePath:${args[0]}`)
   public getResourceFile(filePath: ResourceScript): Array<{
     manifestPath: string;
     sourcePath: string;
@@ -100,12 +105,11 @@ export class BaseResource {
     }));
   }
 
-  @Cacheable((args) => `resolve:${args[0]}`)
+  // @Cacheable((args) => `resolve:${args[0]}`)
   public resolveFilePath(filePath: string): Array<ResourceResolvedItem> {
     const matched = /^\$([a-zA-Z0-9_\-]{1,24})\/(.*?)(?::(.*))?$/gm.exec(filePath);
     if (matched) {
       const [_, resourceName, innerPath, targetPath] = matched;
-      console.log(targetPath);
 
       let resourcePath = glob
         .sync(`./src/**/${resourceName}/manifest.yaml`)
@@ -164,8 +168,9 @@ export class BaseResource {
     if (!this._manifest?.files) return;
 
     for (const file of this._manifest.files) {
-      const resolved = this.resolveFilePath(typeof file === "string" ? file : file.src);
+      if (typeof file !== "string" && file.skipCopy) continue;
 
+      const resolved = this.resolveFilePath(typeof file === "string" ? file : file.src);
       for (const fileItem of resolved) {
         const targetPath = path.dirname(fileItem.target);
         if (!fs.existsSync(targetPath)) fs.mkdirSync(targetPath, { recursive: true });
@@ -196,6 +201,7 @@ export class BaseResource {
       "game",
       "use_fxv2_oal",
       "lua54",
+      "ui_page",
 
       // "resource_manifest_version",
     ] as (keyof IResourceManifest)[]) {
@@ -259,6 +265,9 @@ export class BaseResource {
       for (const file of manifest.files) {
         if (typeof file !== "string" && file.serverOnly) continue;
 
+        if (typeof file !== "string" && file.skipResolve)
+          outputString += `\t'${file.src}',\n`;
+
         const filePath = typeof file === "string" ? file : file.src;
         const resolved = this.resolveFilePath(filePath);
 
@@ -289,6 +298,46 @@ export class BaseResource {
 
     // write to file
     fs.writeFileSync(path.join(this._outputTarget, "fxmanifest.lua"), outputString);
+  }
+
+  protected async callHook<E extends keyof IResourceHooks>(
+    hookName: E,
+    data: Parameters<IResourceHooks[E]>[0] = undefined
+  ): Promise<ReturnType<IResourceHooks[E]> | null> {
+    if (!this._manifest?.hooks?.[hookName]) return null;
+
+    const hookPath = path.resolve(
+      path.join(this._resourceRoot, this._manifest.hooks[hookName])
+    );
+    if (!fs.existsSync(hookPath)) {
+      console.error(
+        `Hook ${hookName} for resource ${this._name} at '${hookPath}' does not exist.`
+      );
+
+      return null;
+    }
+
+    try {
+      const hookModule = await import(hookPath);
+      if (!hookModule) return null;
+
+      const result = await hookModule.default({
+        resourceName: this._name,
+        resourcePath: normalize(path.resolve(this._resourceRoot)),
+        outputTarget: this._outputTarget,
+        manifest: this._manifest,
+
+        data,
+      });
+
+      this._manifest = result.ctx.manifest;
+
+      return result.returned;
+    } catch (error) {
+      console.error(`Failed to call hook ${hookName} for resource ${this._name}`);
+      console.error(error);
+      return null;
+    }
   }
 
   public async deleteBuildFolder() {

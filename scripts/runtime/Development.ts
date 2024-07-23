@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import gitignore from "@gerhobbelt/gitignore-parser";
 
 import { useServer } from "./_Server";
 import { normalize } from "../Utils";
@@ -31,30 +32,55 @@ async function main() {
   };
 
   const isPathIgnored = (filePath: string) =>
-    ["node_modules", ".git"].some((x) => filePath.includes(x));
+    !fs.existsSync(path.join("src", filePath)) ||
+    !fs.fstatSync(fs.openSync(path.join("src", filePath), "r")).isFile() ||
+    [/.*node_modules.*/, /.*\.git.*/].some((x) => x.exec(filePath));
 
-  const buildResources = async (name: string, path: string): Promise<string[] | null> => {
-    const resource = ScriptResource.create(name, path);
+  const buildResources = async (
+    resourceName: string,
+    resourcePath: string,
+    updatedFile: string
+  ): Promise<string[] | null> => {
+    const resource = ScriptResource.create(resourceName, resourcePath);
+
+    const isManifest = updatedFile.endsWith("manifest.yaml");
+    const updateFileRelative = updatedFile.replace(resourceName, "");
+
+    console.log(
+      updatedFile,
+      updateFileRelative,
+      !isManifest,
+      resource.manifest?.watcher?.ignore &&
+        gitignore.compile(resource.manifest.watcher.ignore).denies(updateFileRelative)
+    );
+
+    if (
+      !isManifest &&
+      resource.manifest?.watcher?.ignore &&
+      gitignore.compile(resource.manifest.watcher.ignore).denies(updateFileRelative)
+    )
+      return null;
+
     const result = await resource.build();
 
     if (!result.success) {
-      console.error(`Failed to build resource ${name}`);
+      console.error(`Failed to build resource ${resourceName}`);
       return null;
     }
 
-    if (!resourceImportHierarchy[name]) {
-      return [name];
+    if (!resourceImportHierarchy[resourceName]) {
+      return [resourceName];
     }
 
     let childResources = [];
-    for (const resource of resourceImportHierarchy[name]) {
+    for (const resource of resourceImportHierarchy[resourceName]) {
       resource.build({ reloadManifest: true });
       childResources.push(resource.name);
     }
 
-    console.log("order", [name, ...childResources]);
+    console.log("order", [resourceName, ...childResources]);
 
-    return [name, ...childResources];
+    return [resourceName, ...childResources];
   };
 
   const onFileChange = async (filePath: string) => {
@@ -67,7 +93,11 @@ async function main() {
     if (fileChanges[resourceName]) clearTimeout(fileChanges[resourceName]);
 
     fileChanges[resourceName] = setTimeout(async () => {
-      const resourcesToRestart = await buildResources(resourceName, resourcePath);
+      const resourcesToRestart = await buildResources(
+        resourceName,
+        resourcePath,
+        filePath
+      );
       if (!resourcesToRestart) return;
 
       server.restartResources(resourcesToRestart);

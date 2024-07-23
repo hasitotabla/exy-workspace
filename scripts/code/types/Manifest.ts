@@ -25,6 +25,8 @@ export type ResourceScriptFile = {
 export type ResourceFile = {
   src: string;
   serverOnly?: boolean;
+  skipResolve?: boolean;
+  skipCopy?: boolean;
 };
 
 type IResourceDegenerateBoolean = "yes" | "no";
@@ -54,13 +56,20 @@ export interface IResourceManifest {
   client_scripts: Array<ResourceScriptFile | string>;
   server_scripts: Array<ResourceScriptFile | string>;
 
+  ui_page: string;
   files: Array<ResourceFile | string>;
 
   exports: Array<{ function: string; env: ResourceScriptEnv } | string>;
 
+  // Workspace specific
+
   import_deps: {
     __default__: Array<string>;
     [key: string]: Array<string>;
+  };
+
+  watcher: {
+    ignore?: string;
   };
 }
 
@@ -83,17 +92,14 @@ export const convertManifestValue = (value: any) => {
 
       if (Array.isArray(value)) {
         let output = "{\n";
-        for (const item of value) {
-          output += `${convertManifestValue(item)},\n`;
-        }
+        for (const item of value) output += `\t${convertManifestValue(item)},\n`;
         output += "}";
 
         return output;
       } else {
         let output = "{\n";
-        for (const key in value) {
+        for (const key in value)
           output += `${key} = ${convertManifestValue(value[key])},\n`;
-        }
         output += "}";
 
         return output;

@@ -7,7 +7,7 @@ import {
   type BuildOptions,
   type BuildResult,
 } from "./BaseResource";
-import type { ResourceResolvedItem, ResourceScriptEnv } from "./Manifest";
+import type { ResourceResolvedItem, ResourceScriptEnv } from "../types/Manifest";
 import { BUNDLE_SCRIPTS } from "../../Consts";
 import { isFileChecksumChanged } from "../../utility/Checksum";
 import { useLuaBuilder } from "../builder/LuaBuilder";
@@ -20,6 +20,8 @@ export class ScriptResource extends BaseResource {
   public async build(
     options: Partial<BuildOptions> = DEFAULT_BUILD_OPTIONS
   ): Promise<BuildResult> {
+    await this.callHook("preBuild");
+
     let resourceInclusions: string[] = [];
 
     let didChecksumChange = false;
@@ -59,6 +61,10 @@ export class ScriptResource extends BaseResource {
       }
     }
 
+    const {} = this.callHook("postResolve", {
+      scripts: scriptsToBuild,
+    });
+
     if (!didChecksumChange && !options?.force) {
       console.log(`Skipping build for ${this._name}`);
       return { success: true, data: { resourceInclusions } };
@@ -94,6 +100,8 @@ export class ScriptResource extends BaseResource {
       }
     }
 
+    await this.callHook("postBuild");
+
     this.copyResourceFiles();
     this.generateResourceManifest({
       shared_scripts: this._manifest.shared_scripts ?? [],
@@ -101,6 +109,8 @@ export class ScriptResource extends BaseResource {
       client_scripts: this._manifest.client_scripts ?? [],
     });
     this.deleteBuildFolder();
+
+    await this.callHook("finished");
 
     return { success: true, data: { resourceInclusions } };
   }

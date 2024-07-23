@@ -61,8 +61,6 @@ export function useServer(
       },
       body: JSON.stringify({ resources }),
     });
-
-    const data = await response.text();
   };
 
   return {

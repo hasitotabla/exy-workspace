@@ -12,7 +12,7 @@ import {
   ENV_EXPOSED_PREFIXES,
   MINIFY_OUTPUT,
 } from "../../Consts";
-import type { ResourceResolvedItem, ResourceScriptEnv } from "../resource/Manifest";
+import type { ResourceResolvedItem, ResourceScriptEnv } from "../types/Manifest";
 import { generateString } from "../../Utils";
 
 export interface ILuaBuilderOptions {
