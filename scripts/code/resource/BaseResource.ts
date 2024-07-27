@@ -8,6 +8,7 @@ import {
   convertManifestValue,
   defaultManifestOptions,
   type IResourceManifest,
+  type ResourceManifestScripts,
   type ResourceResolvedItem,
   type ResourceResolvedScripts,
   type ResourceScript,
@@ -180,7 +181,7 @@ export class BaseResource {
     }
   }
 
-  protected generateResourceManifest(scripts: ResourceResolvedScripts): void {
+  protected generateResourceManifest(scripts: ResourceManifestScripts): void {
     let outputString = "";
     const manifest = this._manifest as IResourceManifest;
 
@@ -221,39 +222,14 @@ export class BaseResource {
       if (fs.existsSync(path.join(this._outputTarget, "client_bundle.lua")))
         outputString += `client_script 'client_bundle.lua'\n`;
     } else {
-      const convertToEnvSpecific = (scriptPath: string, env: ResourceScriptEnv) => {
-        const parsedPath = path.parse(scriptPath);
-        return normalize(path.join(parsedPath.dir, `${parsedPath.name}_${env}.lua`));
-      };
-
       for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[]) {
         outputString += `${scriptEnv}_scripts {\n`;
 
-        if (scripts?.shared_scripts)
-          for (const script of scripts.shared_scripts) {
-            if (typeof script !== "string" && script.excludeFromManifest) continue;
+        if (scripts.shared)
+          for (const script of scripts.shared) outputString += `\t"${script}",\n`;
 
-            const scriptSource = typeof script === "string" ? script : script.src;
-            const resolved = this.resolveFilePath(scriptSource);
-            for (const scriptFile of resolved)
-              outputString += `\t"${convertToEnvSpecific(
-                scriptFile.targetManifest,
-                scriptEnv
-              )}",\n`;
-          }
-
-        if (scripts[`${scriptEnv}_scripts`])
-          for (const script of scripts[`${scriptEnv}_scripts`]) {
-            if (typeof script !== "string" && script.excludeFromManifest) continue;
-
-            const scriptSource = typeof script === "string" ? script : script.src;
-            const resolved = this.resolveFilePath(scriptSource);
-            for (const scriptFile of resolved)
-              outputString += `\t"${convertToEnvSpecific(
-                scriptFile.targetManifest,
-                scriptEnv
-              )}",\n`;
-          }
+        if (scripts[scriptEnv])
+          for (const script of scripts[scriptEnv]) outputString += `\t"${script}",\n`;
 
         outputString += "}\n\n";
       }

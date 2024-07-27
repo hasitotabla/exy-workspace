@@ -96,6 +96,7 @@ iprint = function(...)
 end
 
 local manifestData = {};
+
 local functionsToListenTo = {
     "fx_version", "game", "resource_manifest_version", 
     "client_script", "server_script", "shared_script",
@@ -111,11 +112,11 @@ local functionsToListenTo = {
 
     'spawnpoint'
 };
-
-local nop; nop = function() return nop; end
 local nopFunctions = {
     'vehicle_generator'
 };
+
+local nop; nop = function() return nop; end
 
 function createConverter(prop)
     if (not prop) then 

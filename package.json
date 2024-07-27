@@ -19,6 +19,7 @@
     "axios": "^1.6.8",
     "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.4.5",
+    "esbuild": "^0.23.0",
     "glob": "^11.0.0",
     "luamin": "^1.0.4",
     "node-7z": "^3.0.0",
@@ -27,6 +28,6 @@
   },
   "module": "index.ts",
   "peerDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.5.4"
   }
 }

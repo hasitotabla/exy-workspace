@@ -46,13 +46,13 @@ async function main() {
     const isManifest = updatedFile.endsWith("manifest.yaml");
     const updateFileRelative = updatedFile.replace(resourceName, "");
 
-    console.log(
-      updatedFile,
-      updateFileRelative,
-      !isManifest,
-      resource.manifest?.watcher?.ignore &&
-        gitignore.compile(resource.manifest.watcher.ignore).denies(updateFileRelative)
-    );
+    // console.log(
+    //   updatedFile,
+    //   updateFileRelative,
+    //   !isManifest,
+    //   resource.manifest?.watcher?.ignore &&
+    //     gitignore.compile(resource.manifest.watcher.ignore).denies(updateFileRelative)
+    // );
 
     if (
       !isManifest &&
@@ -77,8 +77,6 @@ async function main() {
       resource.build({ reloadManifest: true });
       childResources.push(resource.name);
     }
-
-    console.log("order", [resourceName, ...childResources]);
 
     return [resourceName, ...childResources];
   };

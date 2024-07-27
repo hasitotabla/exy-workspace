@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import * as luamin from "luamin";
 
 import {
+  BUNDLE_SCRIPTS,
   CACHE_FOLDER,
   DEBUG_ENABLED,
   ENV_EXPOSED_PREFIXES,
@@ -14,12 +15,10 @@ import {
 } from "../../Consts";
 import type { ResourceResolvedItem, ResourceScriptEnv } from "../types/Manifest";
 import { generateString } from "../../Utils";
+import type { RuntimeBuilder } from "../Types";
+import type { Required } from "$scripts/Types";
 
-export interface ILuaBuilderOptions {
-  resourceName: string;
-  outputTarget: string;
-  env: { [key: string]: string };
-}
+export interface ILuaBuilderOptions {}
 
 const isLunix = () => ["linux", "darwin"].includes(process.platform);
 
@@ -27,12 +26,12 @@ const preprocessScriptPath = path.resolve(
   `./scripts/vendor/lua/preprocess${isLunix() ? ".sh" : ".cmd"}`
 );
 
-const defaultLuaBuilderOptions: Partial<ILuaBuilderOptions> = {
+const defaultBuilderOptions: Partial<ILuaBuilderOptions> = {
   env: {},
 };
 
-export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
-  const _options = { ...defaultLuaBuilderOptions, ...options } as ILuaBuilderOptions;
+export const useLuaBuilder: RuntimeBuilder<ILuaBuilderOptions> = (options) => {
+  const _options = { ...defaultBuilderOptions, ...options } as Required<typeof options>;
 
   if (!_options.outputTarget)
     throw new Error(`Output target does not exist: ${_options.outputTarget}`);
@@ -163,17 +162,13 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
   const getSourceCode = (source: string, scriptEnv: ResourceScriptEnv) => {
     let content = fs.readFileSync(source, { encoding: "utf-8" });
     let headers = `
-      !local SCRIPT_ENV = '${scriptEnv}';\n
-      !local RESOURCE_NAME = '${_options.resourceName ?? "unknown"}';\n
+      !local SCRIPT_ENV = '${scriptEnv}';
+      !local RESOURCE_NAME = '${_options.resourceName ?? "unknown"}';
+
+      !local IS_SERVER = ${scriptEnv === "server"};
+      !local IS_CLIENT = ${scriptEnv === "client"};
+      !local IS_SHARED = ${scriptEnv === "shared"};
     `;
-
-    if (scriptEnv === "shared")
-      headers += `!local IS_SHARED = true;\n!local IS_SERVER = true;\n!local IS_CLIENT = true;\n`;
-    if (scriptEnv === "server") headers += `!local IS_SERVER = true;\n`;
-    if (scriptEnv === "client") headers += `!local IS_CLIENT = true;\n`;
-
-    // for (const env of ["shared", "server", "client"] as IResourceScriptEnv[])
-    //   if (env === scriptEnv) headers += `!local IS_${env.toUpperCase()} = true;\n`;
 
     headers += Object.keys(_options?.env || {})
       .filter((x) => ENV_EXPOSED_PREFIXES.some((y) => x.startsWith(y)))
@@ -181,9 +176,9 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
         (Prev, Curr) => [
           ...Prev,
           `!local ${Curr} = ${
-            typeof _options.env[Curr] === "string"
-              ? `'${_options.env[Curr]}'`
-              : _options.env[Curr]
+            typeof _options?.env[Curr] === "string"
+              ? `'${_options?.env[Curr]}'`
+              : _options?.env[Curr]
           };`,
         ],
         []
@@ -195,7 +190,50 @@ export function useLuaBuilder(options: Partial<ILuaBuilderOptions>) {
   };
 
   return {
-    compileSource,
-    buildAndBundle,
+    filter: (fileName: string) => fileName.endsWith(".lua"),
+    build: async (scripts) => {
+      const manifestItems: {
+        [key in ResourceScriptEnv]: Array<string>;
+      } = {
+        shared: [],
+        server: [],
+        client: [],
+      };
+
+      if (BUNDLE_SCRIPTS) {
+        for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[])
+          await buildAndBundle([...scripts.shared, ...scripts[scriptEnv]], scriptEnv);
+
+        manifestItems.server = ["server_bundle.lua"];
+        manifestItems.client = ["client_bundle.lua"];
+      } else {
+        for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[]) {
+          const combinedScripts = [...scripts.shared, ...scripts[scriptEnv]];
+
+          for (const script of combinedScripts) {
+            const parsedSource = path.parse(script.source);
+            await compileSource(
+              scriptEnv,
+              script.source,
+              script.target.replace(
+                parsedSource.base,
+                `${parsedSource.name}_${scriptEnv}${parsedSource.ext}`
+              )
+            );
+
+            const parsedTarget = path.parse(script.targetManifest);
+            manifestItems[scriptEnv] = [
+              ...manifestItems[scriptEnv],
+              script.targetManifest.replace(
+                parsedTarget.base,
+                `${parsedTarget.name}_${scriptEnv}${parsedTarget.ext}`
+              ),
+            ];
+          }
+        }
+      }
+
+      return { manifest: manifestItems };
+    },
   };
-}
+};

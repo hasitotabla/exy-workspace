@@ -16,11 +16,15 @@ export type ResourceResolvedScripts = {
   [key in `${ResourceScriptEnv}_scripts`]: Array<ResourceScriptFile | string>;
 };
 
-export type ResourceScriptFile = {
-  excludeFromManifest?: boolean;
-  src: string;
-  env: ResourceScriptEnv;
+export type ResourceManifestScripts = {
+  [key in ResourceScriptEnv]: Array<string>;
 };
+
+// export type ResourceScriptFile = {
+//   excludeFromManifest?: boolean;
+//   src: string;
+//   env: ResourceScriptEnv;
+// };
 
 export type ResourceFile = {
   src: string;

@@ -7,10 +7,19 @@ import {
   type BuildOptions,
   type BuildResult,
 } from "./BaseResource";
-import type { ResourceResolvedItem, ResourceScriptEnv } from "../types/Manifest";
+import type {
+  ResourceManifestScripts,
+  ResourceResolvedItem,
+  ResourceResolvedScripts,
+  ResourceScriptEnv,
+} from "../types/Manifest";
 import { BUNDLE_SCRIPTS } from "../../Consts";
 import { isFileChecksumChanged } from "../../utility/Checksum";
+
 import { useLuaBuilder } from "../builder/LuaBuilder";
+import { useTypescriptBuilder } from "../builder/TSBuilder";
+
+const BUILDERS = [useLuaBuilder, useTypescriptBuilder];
 
 export class ScriptResource extends BaseResource {
   constructor(name: string, path: string) {
@@ -70,44 +79,54 @@ export class ScriptResource extends BaseResource {
       return { success: true, data: { resourceInclusions } };
     }
 
-    const luaBuilder = useLuaBuilder({
-      resourceName: this._name,
-      outputTarget: this._outputTarget,
-      env: this._env,
-    });
+    // const luaBuilder = useLuaBuilder({
+    //   resourceName: this._name,
+    //   outputTarget: this._outputTarget,
+    //   env: this._env,
+    // });
 
-    if (BUNDLE_SCRIPTS) {
-      for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[])
-        await luaBuilder.buildAndBundle(
-          [...scriptsToBuild.shared, ...scriptsToBuild[scriptEnv]],
-          scriptEnv
-        );
-    } else {
-      for (const scriptEnv of ["server", "client"] as ResourceScriptEnv[]) {
-        const combinedScripts = [...scriptsToBuild.shared, ...scriptsToBuild[scriptEnv]];
+    const builtScriptsManifest: ResourceManifestScripts = {
+      shared: [],
+      server: [],
+      client: [],
+    };
+    for (const runtimeBuilder of BUILDERS) {
+      const builder = runtimeBuilder({
+        resourceName: this._name,
+        outputTarget: this._outputTarget,
+        env: this._env,
+      });
 
-        for (const script of combinedScripts) {
-          const parsedFile = path.parse(script.source);
-          await luaBuilder.compileSource(
-            scriptEnv,
-            script.source,
-            script.target.replace(
-              parsedFile.base,
-              `${parsedFile.name}_${scriptEnv}${parsedFile.ext}`
-            )
-          );
-        }
+      const runtimeScripts = {
+        shared: scriptsToBuild.shared.filter((x) => builder.filter(x.source)),
+        server: scriptsToBuild.server.filter((x) => builder.filter(x.source)),
+        client: scriptsToBuild.client.filter((x) => builder.filter(x.source)),
+      };
+
+      const numOfRuntimeScripts = Object.values(runtimeScripts).reduce(
+        (prev, curr) => prev + curr.length,
+        0
+      );
+
+      if (numOfRuntimeScripts < 1) {
+        continue;
+      }
+
+      const { manifest } = await builder.build({
+        shared: runtimeScripts.shared,
+        server: runtimeScripts.server,
+        client: runtimeScripts.client,
+      });
+
+      for (const env of ["server", "client"] as ResourceScriptEnv[]) {
+        builtScriptsManifest[env] = [...builtScriptsManifest[env], ...manifest[env]];
       }
     }
 
     await this.callHook("postBuild");
 
     this.copyResourceFiles();
-    this.generateResourceManifest({
-      shared_scripts: this._manifest.shared_scripts ?? [],
-      server_scripts: this._manifest.server_scripts ?? [],
-      client_scripts: this._manifest.client_scripts ?? [],
-    });
+    this.generateResourceManifest(builtScriptsManifest);
     this.deleteBuildFolder();
 
     await this.callHook("finished");
