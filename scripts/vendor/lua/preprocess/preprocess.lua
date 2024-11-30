@@ -1,6 +1,6 @@
 --[[============================================================
 --=
---=  LuaPreprocess v1.21 - preprocessing library
+--=  LuaPreprocess v1.21-dev - preprocessing library
 --=  by Marcus 'ReFreezed' Thunström
 --=
 --=  License: MIT (see the bottom of this file)
@@ -132,7 +132,7 @@
 
 
 
-local PP_VERSION = "1.21.0"
+local PP_VERSION = "1.21.0-dev"
 
 local MAX_DUPLICATE_FILE_INSERTS  = 1000 -- @Incomplete: Make this a parameter for processFile()/processString().
 local MAX_CODE_LENGTH_IN_MESSAGES = 60
@@ -266,7 +266,6 @@ end
 local function printError(s)
 	io.stderr:write(s, "\n")
 end
-
 local function printfError(s, ...)
 	printError(F(s, ...))
 end
@@ -584,7 +583,7 @@ local function _tokenize(s, path, allowPpTokens, allowBacktickStrings, allowJitS
 				end
 			end
 
-			local n = tonumber(numStr) or tonumber(numStrFallback)
+			local n = tonumber(numStr) or tonumber(numStrFallback) or tonumber(numStrFallback:sub(3), 2)
 
 			if not n then
 				errorInFile(s, path, ptr, "Tokenizer", "Invalid number.")
@@ -811,6 +810,14 @@ local function _tokenize(s, path, allowPpTokens, allowBacktickStrings, allowJitS
 			tok = {type="punctuation", representation=repr, value=repr}
 			ptr = ptr+#repr
 
+		-- math shorthand
+		-- elseif s:find("^[%+%-%*%/]%=", ptr) then 
+		-- 	local repr = s:sub(ptr, ptr+1)
+		-- 	print('genyaxd')
+
+		-- 	tok = {type="punctuation", representation=repr, value=repr}
+		-- 	ptr = ptr+#repr
+
 		-- Preprocessor entry.
 		elseif s:find("^!", ptr) then
 			if not allowPpTokens then
@@ -857,8 +864,8 @@ local function _tokenize(s, path, allowPpTokens, allowBacktickStrings, allowJitS
 			end
 			ptr = i2+1
 			tok = {type="pp_symbol", representation=repr, value=word}
+
 		else
-			-- print(s, string.byte(s), path);
 			errorInFile(s, path, ptr, "Tokenizer", "Unknown character.")
 		end
 
@@ -1343,11 +1350,16 @@ local pack = (
 
 local unpack = (_VERSION >= "Lua 5.2") and table.unpack or _G.unpack
 
-
+local loadEvalReplace = function(code)
+	-- generic math stuff convertion
+	code = code:gsub("([a-zA-Z0-9_]+)%s?([+%-%*%/])=%s?([0-9]+)", "%1 = %1 %2 %3");
+	
+	return code;
+end 
 
 --[[local]] loadLuaString = (
 	(_VERSION >= "Lua 5.2" or jit) and function(lua, chunkName, env)
-		return load(lua, chunkName, "bt", env)
+		return load(loadEvalReplace(lua), chunkName, "bt", env)
 	end
 	or function(lua, chunkName, env)
 		local chunk, err = loadstring(lua, chunkName)

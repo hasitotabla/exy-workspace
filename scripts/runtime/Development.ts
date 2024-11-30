@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+// @ts-expect-error
 import gitignore from "@gerhobbelt/gitignore-parser";
 
 import { useServer } from "./_Server";
@@ -10,111 +11,112 @@ import { buildServer, resourceImportHierarchy } from "../code/Build";
 const resourcesInclusions: { [key: string]: string[] } = {};
 
 async function main() {
-  const server = useServer();
-  const fileChanges: { [key: string]: Timer } = {};
+    const server = useServer();
+    const fileChanges: { [key: string]: Timer } = {};
 
-  const getResourceDetailsFromPath = (
-    filePath: string
-  ): { name: string; path: string } | null => {
-    const splitted = filePath.split("/");
-    for (let i = splitted.length; i > 0; i--) {
-      const resourcePath = path.join("src", ...splitted.slice(0, i), "manifest.yaml");
+    const getResourceDetailsFromPath = (
+        filePath: string
+    ): { name: string; path: string } | null => {
+        const splitted = filePath.split("/");
+        for (let i = splitted.length; i > 0; i--) {
+            const resourcePath = path.join(
+                "src",
+                ...splitted.slice(0, i),
+                "manifest.json"
+            );
 
-      if (fs.existsSync(resourcePath)) {
-        return {
-          name: splitted[i - 1],
-          path: normalize(path.dirname(resourcePath)),
-        };
-      }
-    }
+            if (fs.existsSync(resourcePath)) {
+                return {
+                    name: splitted[i - 1],
+                    path: normalize(path.dirname(resourcePath)),
+                };
+            }
+        }
 
-    return null;
-  };
+        return null;
+    };
 
-  const isPathIgnored = (filePath: string) =>
-    !fs.existsSync(path.join("src", filePath)) ||
-    !fs.fstatSync(fs.openSync(path.join("src", filePath), "r")).isFile() ||
-    [/.*node_modules.*/, /.*\.git.*/].some((x) => x.exec(filePath));
+    const isPathIgnored = (filePath: string) =>
+        !fs.existsSync(path.join("src", filePath)) ||
+        !fs.fstatSync(fs.openSync(path.join("src", filePath), "r")).isFile() ||
+        [/.*node_modules.*/, /.*\.git.*/].some((x) => x.exec(filePath));
 
-  const buildResources = async (
-    resourceName: string,
-    resourcePath: string,
-    updatedFile: string
-  ): Promise<string[] | null> => {
-    const resource = ScriptResource.create(resourceName, resourcePath);
+    const buildResources = async (
+        resourceName: string,
+        resourcePath: string,
+        updatedFile: string
+    ): Promise<string[] | null> => {
+        const resource = ScriptResource.create(resourceName, resourcePath);
 
-    const isManifest = updatedFile.endsWith("manifest.yaml");
-    const updateFileRelative = updatedFile.replace(resourceName, "");
+        const isManifest = updatedFile.endsWith("manifest.json");
+        const updateFileRelative = updatedFile.replace(resourceName, "");
 
-    // console.log(
-    //   updatedFile,
-    //   updateFileRelative,
-    //   !isManifest,
-    //   resource.manifest?.watcher?.ignore &&
-    //     gitignore.compile(resource.manifest.watcher.ignore).denies(updateFileRelative)
-    // );
+        if (
+            !isManifest &&
+            resource.manifest?.watcher?.ignore &&
+            resource.ignore &&
+            gitignore.compile(resource.ignore).denies(updateFileRelative)
+        ) {
+            console.log(`File ${updatedFile} is ignored by the resource ${resourceName}`);
+            return null;
+        }
 
-    if (
-      !isManifest &&
-      resource.manifest?.watcher?.ignore &&
-      gitignore.compile(resource.manifest.watcher.ignore).denies(updateFileRelative)
-    )
-      return null;
+        const result = await resource.build();
 
-    const result = await resource.build();
+        if (!result.success) {
+            console.error(`Failed to build resource ${resourceName}`);
+            return null;
+        }
 
-    if (!result.success) {
-      console.error(`Failed to build resource ${resourceName}`);
-      return null;
-    }
+        if (!resourceImportHierarchy[resourceName]) {
+            return [resourceName];
+        }
 
-    if (!resourceImportHierarchy[resourceName]) {
-      return [resourceName];
-    }
+        let childResources = [];
+        for (const resource of resourceImportHierarchy[resourceName]) {
+            await resource.build({ reloadManifest: true });
+            childResources.push(resource.name);
+        }
 
-    let childResources = [];
-    for (const resource of resourceImportHierarchy[resourceName]) {
-      resource.build({ reloadManifest: true });
-      childResources.push(resource.name);
-    }
+        return [resourceName, ...childResources];
+    };
 
-    return [resourceName, ...childResources];
-  };
+    const onFileChange = async (filePath: string) => {
+        if (isPathIgnored(filePath)) return;
 
-  const onFileChange = async (filePath: string) => {
-    if (isPathIgnored(filePath)) return;
+        const resourceData = getResourceDetailsFromPath(filePath);
+        if (!resourceData) return;
 
-    const resourceData = getResourceDetailsFromPath(filePath);
-    if (!resourceData) return;
+        const { name: resourceName, path: resourcePath } = resourceData;
+        if (fileChanges[resourceName]) clearTimeout(fileChanges[resourceName]);
 
-    const { name: resourceName, path: resourcePath } = resourceData;
-    if (fileChanges[resourceName]) clearTimeout(fileChanges[resourceName]);
+        fileChanges[resourceName] = setTimeout(async () => {
+            await server.stopResources([resourceName]);
 
-    fileChanges[resourceName] = setTimeout(async () => {
-      const resourcesToRestart = await buildResources(
-        resourceName,
-        resourcePath,
-        filePath
-      );
-      if (!resourcesToRestart) return;
+            const resourcesToRestart = await buildResources(
+                resourceName,
+                resourcePath,
+                filePath
+            );
+            if (!resourcesToRestart) return;
 
-      server.restartResources(resourcesToRestart);
-    }, 500);
-  };
+            server.restartResources(resourcesToRestart);
+        }, 500);
+    };
 
-  fs.watch(
-    "./src",
-    { recursive: true },
-    (event, fileName) => fileName && onFileChange(normalize(fileName))
-  );
+    fs.watch(
+        "./src",
+        { recursive: true },
+        (event, fileName) => fileName && onFileChange(normalize(fileName))
+    );
 
-  server.start();
+    server.start();
 }
 
 if (import.meta && import.meta.main) {
-  console.log("Building server...");
-  await buildServer();
-  console.log("Build finished");
+    console.log("Building server...");
+    await buildServer();
+    console.log("Build finished");
 
-  main();
+    main();
 }

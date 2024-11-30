@@ -1,35 +1,28 @@
-import type {
-  IResourceManifest,
-  ResourceResolvedItem,
-  ResourceScriptEnv,
-} from "./Manifest";
+import type { IResourceManifest, ResourceResolvedItem, ResourceScriptEnv } from "./Manifest";
 
 export type MaybePromise<T> = T | Promise<T>;
+export type ResourceScripts = {
+    [key in ResourceScriptEnv]: Array<ResourceResolvedItem>;
+};
 
 export interface IResourceHooks {
-  finished: () => void;
+    finished: (data: {}) => void;
 
-  preBuild: () => void;
-  postBuild: () => {
-    manifest: IResourceManifest;
-  };
+    preBuild: (data: {}) => void;
+    postBuild: (data: {}) => {
+        // manifest: IResourceManifest;
+    };
 
-  postResolve: (data: {
-    scripts: {
-      [key in ResourceScriptEnv]: Array<ResourceResolvedItem>;
+    postResolve: (data: { scripts: ResourceScripts }) => {
+        scripts: ResourceScripts;
     };
-  }) => {
-    scripts: {
-      [key in ResourceScriptEnv]: Array<ResourceResolvedItem>;
-    };
-  };
 }
 
 export type ResourceHookSharedData<T extends keyof IResourceHooks = any> = {
-  resourceName: string;
-  resourcePath: string;
-  outputTarget: string;
-  manifest: IResourceManifest;
+    resourceName: string;
+    resourcePath: string;
+    outputTarget: string;
+    manifest: IResourceManifest;
 
-  data: Parameters<IResourceHooks[T]>;
+    data: Parameters<IResourceHooks[T]>;
 };

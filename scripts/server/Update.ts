@@ -12,23 +12,26 @@ import { useArguments } from "../utility/Arguments";
 type ServerBranches = "master" | "recommended" | "latest";
 const VALID_BRANCHES: ServerBranches[] = ["master", "recommended", "latest"];
 
+const usedPlatform =
+  process.platform == "win32" ? "build_server_windows" : "build_proot_linux";
+
 const cmdParser = useArguments();
 
-const usedBranch = cmdParser.get<ServerBranches>("--branch", "recommended", ["-b"]);
+const usedBranch = cmdParser.get<ServerBranches>("--branch", "latest", ["-b"]);
 if (!usedBranch || !VALID_BRANCHES.includes(usedBranch)) {
   console.error("Invalid branch specified");
   process.exit(1);
 }
 
-async function getLatestRelease(
+async function getRelease(
   platform: string,
-  branch: ServerBranches
+  branch: ServerBranches,
 ): Promise<string | null> {
   let htmlData = "";
 
   try {
     const { data } = await axios.get(
-      `https://runtime.fivem.net/artifacts/fivem/${platform}/master/`
+      `https://runtime.fivem.net/artifacts/fivem/${platform}/master/`,
     );
     if (!data) {
       throw new Error("No data returned from the server");
@@ -108,9 +111,9 @@ async function extractServer(fileName: string, outputFolder: string): Promise<bo
         node7z
           .extractFull(`.cache/${fileName}`, outputFolder, {
             $bin:
-              process.platform == "win32"
-                ? path.resolve("./scripts/vendor/7z.exe")
-                : "7z",
+              process.platform == "win32" ?
+                path.resolve("./scripts/vendor/7z.exe")
+              : "7z",
           })
           .on("error", (err) => reject(err))
           .on("end", () => {
@@ -132,18 +135,15 @@ async function extractServer(fileName: string, outputFolder: string): Promise<bo
 }
 
 export async function updateServer(
-  forceUpdate = false,
-  spinnerHandle: Ora | null = null
+  branch: ServerBranches,
+  spinnerHandle: Ora | null = null,
 ): Promise<boolean> {
   if (spinnerHandle) {
     spinnerHandle.text = "Checking for updates...";
     spinnerHandle.color = "green";
   }
 
-  const latestReleaseUrl = await getLatestRelease(
-    process.platform == "win32" ? "build_server_windows" : "build_proot_linux",
-    "latest"
-  );
+  const latestReleaseUrl = await getRelease(usedPlatform, branch);
   if (!latestReleaseUrl) {
     if (spinnerHandle) spinnerHandle.fail(`Failed to get ${usedBranch}'s release URL`);
 
@@ -183,7 +183,8 @@ export async function updateServer(
 
 if (import.meta && import.meta.main) {
   const spinner = ora("Updating server...").start();
-  const result = await updateServer(false, spinner);
+
+  const result = await updateServer(usedBranch, spinner);
 
   if (!result) {
     spinner.fail("Failed to update the server");
